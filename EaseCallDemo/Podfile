@@ -5,13 +5,13 @@ platform :ios, '10.0'
 source 'https://github.com/CocoaPods/Specs.git'
 
 target 'EaseCallDemo' do
+  pod 'HyphenateChat', '4.15.0'
   pod 'WHToast'
   pod 'MBProgressHUD', '1.2.0'
   pod 'EaseCallKit',  :path => "../"
 end
 
 post_install do |installer|
-
   installer.generated_projects.each do |project|
     project.targets.each do |target|
       target.build_configurations.each do |config|
@@ -22,14 +22,11 @@ post_install do |installer|
   end
 end
 
-
 pre_install do |installer|
   # 定义 AgoraRtcEngine_iOS framework 的路径
   rtc_pod_path = File.join(installer.sandbox.root, 'AgoraRtcEngine_iOS')
-
   # aosl.xcframework 的完整路径
   aosl_xcframework_path = File.join(rtc_pod_path, 'aosl.xcframework')
-
   # 检查文件是否存在，如果存在则删除
   if File.exist?(aosl_xcframework_path)
     puts "Deleting aosl.xcframework from #{aosl_xcframework_path}"
@@ -38,4 +35,5 @@ pre_install do |installer|
     puts "aosl.xcframework not found, skipping deletion."
   end
 end
+
 

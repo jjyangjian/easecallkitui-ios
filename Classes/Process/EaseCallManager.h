@@ -50,26 +50,46 @@
 /**
  * 通话中对方加入会议时触发该回调
  */
--(void)remoteUserDidJoinChannel:( NSString*_Nonnull)aChannelName uid:(NSInteger)aUid username:(NSString*_Nullable)aUserName;
+-(void)remoteUserDidJoinChannel:( NSString*_Nonnull)channel
+                       agoraUid:(NSInteger)agoraUid
+                    im_username:(NSString*_Nullable)im_username;
+
+//下面两个回调二选一,具体需要根据加入音视频通道的方式来定
+//下面两个回调二选一,具体需要根据加入音视频通道的方式来定
+//下面两个回调二选一,具体需要根据加入音视频通道的方式来定
+/**
+ * ⚠️通话中自己加入会议成功时触发该回调
+ */
+- (void)callDidJoinChannel:(NSString*_Nonnull)channelName
+                  agoraUid:(NSUInteger)agoraUid;
 
 /**
- * 通话中自己加入会议成功时触发该回调
+ * ⚠️通话中自己加入会议成功时触发该回调(携带username) 只能使用im_username加入通道才会执行这个方法
  */
-- (void)callDidJoinChannel:(NSString*_Nonnull)aChannelName uid:(NSUInteger)aUid;
+- (void)callDidJoinChannel:(NSString*_Nonnull)channelName
+                  agoraUid:(NSUInteger)agoraUid
+               im_username:(NSString *_Nonnull)im_username;
+
 @end
 
 @interface EaseCallManager : NSObject
-+(instancetype _Nonnull ) alloc __attribute__((unavailable("call sharedManager instead")));
-+(instancetype _Nonnull ) new __attribute__((unavailable("call sharedManager instead")));
--(instancetype _Nonnull ) copy __attribute__((unavailable("call sharedManager instead")));
--(instancetype _Nonnull ) mutableCopy __attribute__((unavailable("call sharedManager instead")));
++ (instancetype _Nonnull ) alloc __attribute__((unavailable("call sharedManager instead")));
++ (instancetype _Nonnull ) new __attribute__((unavailable("call sharedManager instead")));
+- (instancetype _Nonnull ) copy __attribute__((unavailable("call sharedManager instead")));
+- (instancetype _Nonnull ) mutableCopy __attribute__((unavailable("call sharedManager instead")));
 + (instancetype _Nonnull )sharedManager;
 /**
  * EaseCall模块初始化
  * @param aConfig         EaseCall的配置，包括用户昵称、头像、呼叫超时时间等
  * @param aDelegate    回调监听
  */
-- (void)initWithConfig:(EaseCallConfig*_Nullable)aConfig delegate:(id<EaseCallDelegate>_Nullable)aDelegate;
+- (void)initWithConfig:(EaseCallConfig *_Nullable)aConfig delegate:(id<EaseCallDelegate>_Nullable)aDelegate;
+
+/**
+ * EaseCall模块重置,切换账号使用
+ */
+- (void)reset:(NSString *_Nonnull)im_username;
+
 /**
  * 邀请成员进行单人通话
  * @param uId         被邀请人的环信ID

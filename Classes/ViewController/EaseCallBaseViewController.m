@@ -22,13 +22,11 @@
     [super viewDidLoad];
     // Do any additional setup after loading the view.
     [self setubSubViews];
-    
     self.speakerButton.selected = YES;
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(usersInfoUpdated) name:@"EaseCallUserUpdated" object:nil];
 }
 
-- (void)dealloc
-{
+- (void)dealloc{
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
@@ -44,16 +42,20 @@
     [self.view addSubview:self.contentView];
     
     [self.contentView mas_makeConstraints:^(MASConstraintMaker *make) {
-        if (@available(iOS 11,*)) {
-            make.top.equalTo(self.view.mas_safeAreaLayoutGuideTop);
-            make.left.equalTo(self.view.mas_safeAreaLayoutGuideLeft);
-            make.right.equalTo(self.view.mas_safeAreaLayoutGuideRight);
-            make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom);
-        }else {
-            make.edges.equalTo(self.view);
-         }
-       
+        make.edges.equalTo(self.view);
+//        if (@available(iOS 11,*)) {
+//            make.top.equalTo(self.view.mas_safeAreaLayoutGuideTop);
+//            make.left.equalTo(self.view.mas_safeAreaLayoutGuideLeft);
+//            make.right.equalTo(self.view.mas_safeAreaLayoutGuideRight);
+//            make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom);
+//        }else {
+//            make.edges.equalTo(self.view);
+//         }
     }];
+    
+    
+    
+    
     
     self.miniButton = [[UIButton alloc] init];
     self.miniButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
@@ -62,23 +64,38 @@
     [self.contentView addSubview:self.miniButton];
     [self.miniButton setTintColor:[UIColor whiteColor]];
     [self.miniButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.contentView);
-        make.left.equalTo(@10);
-        make.width.height.equalTo(@40);
+        make.top.equalTo(self.view.mas_safeAreaLayoutGuideTop);
+        make.left.equalTo(@8);
+        make.width.height.equalTo(@44);
     }];
     
+//    UIStackView *hstack = UIStackView.new;
+//    hstack.axis = UILayoutConstraintAxisHorizontal;
+//    hstack.alignment = UIStackViewAlignmentCenter;
+////    hstack.description = UIStackViewDistributionEqualSpacing;
+//    [self.contentView addSubview:hstack];
+//    [hstack mas_makeConstraints:^(MASConstraintMaker *make) {
+//        make.left.mas_equalTo(32);
+//        make.right.mas_equalTo(-32);
+//        make.height.mas_equalTo(60);
+//        make.bottom.mas_equalTo(self.contentView.mas_safeAreaLayoutGuideBottom).offset(-30);
+//    }];
+//    hstack.backgroundColor = UIColor.yellowColor;
+    
+    //挂断;
     self.hangupButton = [[UIButton alloc] init];
     self.hangupButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
     [self.hangupButton setImage:[UIImage imageNamedFromBundle:@"hangup"] forState:UIControlStateNormal];
     [self.hangupButton addTarget:self action:@selector(hangupAction) forControlEvents:UIControlEventTouchUpInside];
     [self.contentView addSubview:self.hangupButton];
     [self.hangupButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.bottom.equalTo(self.contentView).offset(-60);
+        make.bottom.equalTo(self.contentView.mas_safeAreaLayoutGuideBottom).offset(-32);
         make.left.equalTo(@30);
         make.width.height.equalTo(@60);
         //make.centerX.equalTo(@60);
     }];
     
+    //接听;
     self.answerButton = [[UIButton alloc] init];
     self.answerButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
     [self.answerButton setImage:[UIImage imageNamedFromBundle:@"answer"] forState:UIControlStateNormal];

@@ -9,7 +9,7 @@
 #import <EaseCallKit/EaseCallUIKit.h>
 #import <HyphenateChat/HyphenateChat.h>
 
-#define AGORA_APP_ID @"15cb0d28b87b425ea613fc46f7c9f974"
+#import "Keys.h"
 
 @interface HomeViewController ()<EaseCallDelegate>
 
@@ -20,19 +20,43 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     // Do any additional setup after loading the view.
-    [self setupCallKitWithUid:EMClient.sharedClient.currentUsername];
+    UIApplication.sharedApplication.keyWindow.rootViewController;
+    NSLog(@"%lf",self.view.safeAreaInsets.top);
+    NSLog(@"%lf",self.view.safeAreaInsets.bottom);
+
+    
+    // 获取顶部安全区域高度
+    CGFloat topInset = self.additionalSafeAreaInsets.top;
+    
+    // 获取底部安全区域高度
+    CGFloat bottomInset = self.additionalSafeAreaInsets.bottom;
+    
+    NSLog(@"Top Safe Area Inset: %f", topInset);
+    NSLog(@"Bottom Safe Area Inset: %f", bottomInset);
+
+    
+    [self setupCallKitWithUsername:EMClient.sharedClient.currentUsername];
+
+    
+    
 }
 
-- (void)setupCallKitWithUid:(NSString *)aUId{
+- (void)setupCallKitWithUsername:(NSString *)username{
+    
     EaseCallUser* callUser = [[EaseCallUser alloc] init];
     callUser.nickName = @"du001的昵称";
+    
     EaseCallConfig* config = [[EaseCallConfig alloc] init];
-    config.users = [NSMutableDictionary dictionaryWithObject:callUser forKey:aUId];
-    config.agoraAppId = AGORA_APP_ID;
+    config.users = [NSMutableDictionary dictionaryWithObject:callUser forKey:username];
+    config.agoraAppId = AG_APP_ID;
     config.enableRTCTokenValidate = YES;
+    
+    config.useIMUsernameJoinChannel = true;
+    config.im_username = username;
     //config.encoderConfiguration = [[AgoraVideoEncoderConfiguration alloc] initWithSize:AgoraVideoDimension1280x720 frameRate:AgoraVideoFrameRateFps24 bitrate:AgoraVideoBitrateStandard orientationMode:AgoraVideoOutputOrientationModeAdaptative];
     [[EaseCallManager sharedManager] initWithConfig:config delegate:self];
 }
+
 
 
 - (void)callDidEnd:(NSString * _Nonnull)aChannelName
@@ -183,4 +207,18 @@
 
     [task resume];
 }
+
+- (void)callDidJoinChannel:(NSString*_Nonnull)aChannelName agoraUid:(NSUInteger)agoraUid im_username:(NSString * _Nonnull)im_username{
+    if([im_username isEqualToString:@"test01"]){
+        EaseCallUser* user = [EaseCallUser userWithNickName:[NSString stringWithFormat:@"%@(我)",@"昵称"] image:[NSURL URLWithString:@"https://..."]];
+        [[[EaseCallManager sharedManager] getEaseCallConfig] setUser:im_username info:user];
+    }
+//    EMUserInfo* userInfo = [[UserInfoStore sharedInstance] getUserInfoById:emUsername];
+//    if(userInfo && (userInfo.avatarUrl.length > 0 || userInfo.nickname.length > 0)) {
+//        EaseCallUser* user = [EaseCallUser userWithNickName:[NSString stringWithFormat:@"%@(我)",userInfo.nickname] image:[NSURL URLWithString:userInfo.avatarUrl]];
+//        [[[EaseCallManager sharedManager] getEaseCallConfig] setUser:emUsername info:user];
+//    }
+}
+
+
 @end

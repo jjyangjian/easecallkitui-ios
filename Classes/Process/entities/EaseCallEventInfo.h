@@ -134,6 +134,12 @@ NS_ASSUME_NONNULL_BEGIN
  */
 @property(nonatomic)bool toAudio;
 
+//消息 from to type ...
+@property(nonatomic,copy)NSString *from;
+@property(nonatomic)EMChatType chat_type;
+@property(nonatomic,copy)NSString *conversation_id;
+@property(nonatomic,copy)NSString *to;
+
 /**
  isEffective
  status

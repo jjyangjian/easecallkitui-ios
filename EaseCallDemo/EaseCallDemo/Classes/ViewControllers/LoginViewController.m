@@ -36,6 +36,11 @@
         }
     }];
 }
+- (void)viewDidAppear:(BOOL)animated{
+    [super viewDidAppear:animated];
+    self.usernameField.text = @"yy1";
+    self.pwdField.text = @"1";
+}
 
 - (IBAction)loginAction:(id)sender {
     [self.view endEditing:YES];

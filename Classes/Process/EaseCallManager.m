@@ -19,6 +19,9 @@
 #import "EaseCallCommon.h"
 #import "EaseCallEventInfo.h"
 
+#import "EaseCallMultiVC.h"
+
+
 static NSString* kAction = @"action";
 static NSString* kChannelName = @"channelName";
 static NSString* kCallType = @"type";
@@ -99,8 +102,18 @@ static EaseCallManager *easeCallManager = nil;
             [self.agoraKit setLocalAccessPoint:self.config.localConfig];
         }
     }
-    
-    self.modal.curUserAccount = [[EMClient sharedClient] currentUsername];
+    if (!self.config.im_username.length) {
+        self.config.im_username = EMClient.sharedClient.currentUsername;
+    }
+    self.modal.curUserAccount = self.config.im_username;
+}
+
+- (void)reset:(NSString *)im_username{
+    self.config.im_username = im_username;
+    if (!self.config.im_username.length) {
+        self.config.im_username = EMClient.sharedClient.currentUsername;
+    }
+    self.modal.curUserAccount = self.config.im_username;
 }
 
 - (EaseCallConfig*)getEaseCallConfig
@@ -163,18 +176,21 @@ static EaseCallManager *easeCallManager = nil;
     dispatch_async(weakself.workQueue, ^{
         if(weakself.modal.currentCall && weakself.callVC) {
             NSLog(@"inviteUsers in group");
-            EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeInvite];
-            eventInfo.call_id = weakself.modal.currentCall.callId;
-            eventInfo.channel_name = weakself.modal.currentCall.channelName;
-            eventInfo.call_type = weakself.modal.currentCall.callType;
-            eventInfo.callerDevice_id = self.modal.curDevId;
-            eventInfo.subExt = aExt;
             for(NSString *im_username in aUsers) {
                 if([weakself.modal.currentCall.allUserAccounts.allValues containsObject:im_username])
                     continue;
-                [weakself sendMessage_invite_calleeUsername:im_username eventInfo:eventInfo completion:^(NSString *callId, EaseCallError *error) {
+                
+                EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeInvite];
+                eventInfo.call_id = weakself.modal.currentCall.callId;
+                eventInfo.channel_name = weakself.modal.currentCall.channelName;
+                eventInfo.call_type = weakself.modal.currentCall.callType;
+                eventInfo.callerDevice_id = self.modal.curDevId;
+                eventInfo.subExt = aExt;
+                eventInfo.chat_type = EMChatTypeChat;
+                eventInfo.conversation_id = im_username;
+                eventInfo.to = im_username;
+                [weakself sendMessage_invite_eventInfo:eventInfo completion:^(NSString *callId, EaseCallError *error) {
                 }];
-//                [weakself sendInviteMsgToCallee:im_username type:weakself.modal.currentCall.callType callId:weakself.modal.currentCall.callId channelName:weakself.modal.currentCall.channelName ext:aExt completion:nil];
                 [weakself _startCallTimer:im_username];
                 dispatch_async(dispatch_get_main_queue(), ^{
                     [[weakself getMultiVC] setPlaceHolderUrl:[weakself getHeadImageByUserName:im_username] member:im_username];
@@ -191,18 +207,20 @@ static EaseCallManager *easeCallManager = nil;
             weakself.modal.state = EaseCallState_Answering;
             weakself.modal.currentCall.ext = aExt;
             
-            EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeInvite];
-            eventInfo.call_id = weakself.modal.currentCall.callId;
-            eventInfo.channel_name = weakself.modal.currentCall.channelName;
-            eventInfo.call_type = weakself.modal.currentCall.callType;
-            eventInfo.callerDevice_id = self.modal.curDevId;
-            eventInfo.subExt = aExt;
-            
+
             dispatch_async(dispatch_get_main_queue(), ^{
                 for(NSString* im_username in aUsers) {
-                    [weakself sendMessage_invite_calleeUsername:im_username eventInfo:eventInfo completion:^(NSString *callId, EaseCallError *error) {
+                    EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeInvite];
+                    eventInfo.call_id = weakself.modal.currentCall.callId;
+                    eventInfo.channel_name = weakself.modal.currentCall.channelName;
+                    eventInfo.call_type = weakself.modal.currentCall.callType;
+                    eventInfo.callerDevice_id = self.modal.curDevId;
+                    eventInfo.subExt = aExt;
+                    eventInfo.chat_type = EMChatTypeChat;
+                    eventInfo.conversation_id = im_username;
+                    eventInfo.to = im_username;
+                    [weakself sendMessage_invite_eventInfo:eventInfo completion:^(NSString *callId, EaseCallError *error) {
                     }];
-//                    [weakself sendInviteMsgToCallee:uId type:weakself.modal.currentCall.callType callId:weakself.modal.currentCall.callId channelName:weakself.modal.currentCall.channelName ext:aExt completion:nil];
                     [weakself _startCallTimer:im_username];
                     [[weakself getMultiVC] setPlaceHolderUrl:[weakself getHeadImageByUserName:im_username] member:im_username];
                 }
@@ -265,9 +283,12 @@ static EaseCallManager *easeCallManager = nil;
             eventInfo.call_type = weakself.modal.currentCall.callType;
             eventInfo.callerDevice_id = self.modal.curDevId;
             eventInfo.subExt = aExt;
-            
+            eventInfo.chat_type = EMChatTypeChat;
+            eventInfo.conversation_id = im_username;
+            eventInfo.to = im_username;
+
             dispatch_async(dispatch_get_main_queue(), ^{
-                [weakself sendMessage_invite_calleeUsername:im_username eventInfo:eventInfo completion:aCompletionBlock];
+                [weakself sendMessage_invite_eventInfo:eventInfo completion:aCompletionBlock];
 //                [weakself sendInviteMsgToCallee:uId type:weakself.modal.currentCall.callType callId:weakself.modal.currentCall.callId channelName:weakself.modal.currentCall.channelName ext:aExt completion:aCompletionBlock];
                 [weakself _startCallTimer:uId];
 //                if(aCompletionBlock)
@@ -386,7 +407,8 @@ static EaseCallManager *easeCallManager = nil;
 {
     if(self.modal.currentCall) {
         if(self.modal.currentCall.callType == EaseCallTypeMulti && self.modal.currentCall.isCaller) {
-            self.callVC = [[EaseCallMultiViewController alloc] init];
+//            self.callVC = [[EaseCallMultiViewController alloc] init];
+            self.callVC = [[EaseCallMultiVC alloc] init];
             self.callVC.modalPresentationStyle = UIModalPresentationFullScreen;
             UIWindow* keyWindow = [self getKeyWindow];
             if(!keyWindow)
@@ -412,7 +434,8 @@ static EaseCallManager *easeCallManager = nil;
         }
         [self playSound];
         if(self.modal.currentCall.callType == EaseCallTypeMulti) {
-            self.callVC = [[EaseCallMultiViewController alloc] init];
+            //            self.callVC = [[EaseCallMultiViewController alloc] init];
+                        self.callVC = [[EaseCallMultiVC alloc] init];
             [self getMultiVC].inviterId = self.modal.currentCall.remoteUserAccount;
             self.callVC.modalPresentationStyle = UIModalPresentationFullScreen;
             UIWindow* keyWindow = [self getKeyWindow];
@@ -517,12 +540,12 @@ static EaseCallManager *easeCallManager = nil;
         [self _parseMessage:msg];
     }
     return;
-    __weak typeof(self) weakself = self;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        for (EMChatMessage *msg in aMessages) {
-            [weakself _parseMsg:msg];
-        }
-    });
+//    __weak typeof(self) weakself = self;
+//    dispatch_async(dispatch_get_main_queue(), ^{
+//        for (EMChatMessage *msg in aMessages) {
+//            [weakself _parseMsg:msg];
+//        }
+//    });
 }
 
 - (void)cmdMessagesDidReceive:(NSArray *)aCmdMessages
@@ -531,20 +554,20 @@ static EaseCallManager *easeCallManager = nil;
         [self _parseMessage:msg];
     }
     return;
-    __weak typeof(self) weakself = self;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        for (EMChatMessage *msg in aCmdMessages) {
-            [weakself _parseMsg:msg];
-        }
-    });
+//    __weak typeof(self) weakself = self;
+//    dispatch_async(dispatch_get_main_queue(), ^{
+//        for (EMChatMessage *msg in aCmdMessages) {
+//            [weakself _parseMsg:msg];
+//        }
+//    });
 }
 
 #pragma mark - sendMessage
 /**
  发送呼叫邀请消息
- calleeUsername 被呼叫者的 im-username
+ calleeUsername 被呼叫者的 im-username calleeUsername:(NSString *)calleeUsername
  */
-- (void)sendMessage_invite_calleeUsername:(NSString *)calleeUsername eventInfo:(EaseCallEventInfo *)eventInfo completion:(void (^)(NSString* callId,EaseCallError*error))aCompletionBlock{
+- (void)sendMessage_invite_eventInfo:(EaseCallEventInfo *)eventInfo completion:(void (^)(NSString* callId,EaseCallError*error))aCompletionBlock{
     
     NSString* strType = EaseCallLocalizableString(@"voice", nil);
     if(eventInfo.call_type == EaseCallTypeMulti)
@@ -553,7 +576,7 @@ static EaseCallManager *easeCallManager = nil;
         strType = EaseCallLocalizableString(@"video", nil);
     EMTextMessageBody* msgBody = [[EMTextMessageBody alloc] initWithText:[NSString stringWithFormat: EaseCallLocalizableString(@"inviteInfo", nil),strType]];
     
-    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:calleeUsername from:self.modal.curUserAccount to:calleeUsername body:msgBody ext:eventInfo.generateMessageExt];
+    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:eventInfo.conversation_id from:self.modal.curUserAccount to:eventInfo.to body:msgBody ext:eventInfo.generateMessageExt];
     
     __weak typeof(self) weakself = self;
     [[[EMClient sharedClient] chatManager] sendMessage:msg progress:nil completion:^(EMChatMessage *message, EMError *error) {
@@ -567,57 +590,10 @@ static EaseCallManager *easeCallManager = nil;
     }];
 }
 
-//发送呼叫邀请消息(弃用) - (void)sendMessage_invite_calleeUsername:(NSString *)calleeUsername eventInfo:(EaseCallEventInfo *)eventInfo completion:(void (^)(NSString* callId,EaseCallError*error))aCompletionBlock
-- (void)_sendInviteMsgToCallee:(NSString*)aUid type:(EaseCallType)aType callId:(NSString*)aCallId channelName:(NSString*)aChannelName ext:(NSDictionary*)aExt completion:(void (^)(NSString* callId,EaseCallError*))aCompletionBlock
-{
-    if([aUid length] == 0 || [aCallId length] == 0 || [aChannelName length] == 0)
-        return;
-    NSString* strType = EaseCallLocalizableString(@"voice", nil);
-    if(aType == EaseCallTypeMulti)
-        strType = EaseCallLocalizableString(@"conferenece", nil);
-    if(aType == EaseCallType1v1Video)
-        strType = EaseCallLocalizableString(@"video", nil);
-    EMTextMessageBody* msgBody = [[EMTextMessageBody alloc] initWithText:[NSString stringWithFormat: EaseCallLocalizableString(@"inviteInfo", nil),strType]];
-//    NSMutableDictionary* ext = [
-//        @{kMsgType:kMsgTypeValue,
-//          kAction:kInviteAction,
-//          kCallId:aCallId,
-//          kCallType:[NSNumber numberWithInt:(int)aType],
-//          kCallerDevId:self.modal.curDevId,
-//          kChannelName:aChannelName,
-//          kTs:[self getTs]} mutableCopy];
-//    if(aExt && aExt.count > 0) {
-//        [ext setValue:aExt forKey:kExt];
-//    }
-    EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeInvite];
-    eventInfo.call_id = aCallId;
-    eventInfo.channel_name = aChannelName;
-    eventInfo.call_type = aType;
-    eventInfo.callerDevice_id = self.modal.curDevId;
-    eventInfo.subExt = aExt;
-    NSDictionary * finalExt = eventInfo.generateMessageExt;
-//    if(aType == EaseCallType1v1Audio) {
-//        [ext setObject:EMCOMMUNICATE_TYPE_VOICE forKey:EMCOMMUNICATE_TYPE];
-//    }
-//    if(aType == EaseCallType1v1Video) {
-//        [ext setObject:EMCOMMUNICATE_TYPE_VIDEO forKey:EMCOMMUNICATE_TYPE];
-//    }
-    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:aUid from:self.modal.curUserAccount to:aUid body:msgBody ext:finalExt];
-    __weak typeof(self) weakself = self;
-    [EaseCallCommon printLog:@"发送消息::[邀请者在整条逻辑的第1条消息]发起方发起第一条消息,呼叫消息,呼叫邀请"];
-    [EaseCallCommon printMessage:msg];
-    [[[EMClient sharedClient] chatManager] sendMessage:msg progress:nil completion:^(EMChatMessage *message, EMError *error) {
-        if(aCompletionBlock)
-            aCompletionBlock(weakself.modal.currentCall.callId,nil);
-        if(error) {
-            [weakself callBackError:EaseCallErrorTypeIM code:error.code description:error.errorDescription];
-        }
-    }];
-}
 
-//内部反馈消息(被邀请者收到邀请消息后会立刻发一条此消息)
-- (void)sendMessage_firstFeedback_callerUsername:(NSString *)callerUsername eventInfo:(EaseCallEventInfo *)eventInfo{
-    if (!callerUsername.length || !eventInfo.call_id.length || !eventInfo.callerDevice_id.length){
+//内部反馈消息(被邀请者收到邀请消息后会立刻发一条此消息) callerUsername:(NSString *)callerUsername
+- (void)sendMessage_firstFeedback_eventInfo:(EaseCallEventInfo *)eventInfo{
+    if (!eventInfo.to.length || !eventInfo.call_id.length || !eventInfo.callerDevice_id.length){
         [self callBackError:EaseCallErrorTypeProcess code:EaseCallProcessErrorCodeInvalidParams description:@"参数异常"];
         return;
     }
@@ -626,7 +602,7 @@ static EaseCallManager *easeCallManager = nil;
     EMCmdMessageBody* msgBody = [[EMCmdMessageBody alloc] initWithAction:@"rtcCall"];
     msgBody.isDeliverOnlineOnly = YES;
 //    NSDictionary* ext = @{kMsgType:kMsgTypeValue,kAction:kAlertAction,kCallId:aCallId,kCalleeDevId:self.modal.curDevId,kCallerDevId:aDevId,kTs:[self getTs]};
-    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:callerUsername from:self.modal.curUserAccount to:callerUsername body:msgBody ext:eventInfo.generateMessageExt];
+    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:eventInfo.conversation_id from:self.modal.curUserAccount to:eventInfo.to body:msgBody ext:eventInfo.generateMessageExt];
     __weak typeof(self) weakself = self;
     [[[EMClient sharedClient] chatManager] sendMessage:msg progress:nil completion:^(EMChatMessage *message, EMError *error) {
         [EaseCallCommon printLog:@"发送消息::[被邀请者在整条逻辑的第1条消息]这条消息表示设备本身收到邀请消息"];
@@ -637,28 +613,10 @@ static EaseCallManager *easeCallManager = nil;
     }];
 }
 
-// 发送alert消息(弃用) - (void)sendMessage_feedback_callerUsername:(NSString *)callerUsername eventInfo:(EaseCallEventInfo *)eventInfo
-- (void)_sendAlertMsgToCaller:(NSString*)aCallerUid callId:(NSString*)aCallId devId:(NSString*)aDevId
-{
-    if([aCallerUid length] == 0 || [aCallId length] == 0 || [aDevId length] == 0)
-        return;
-    EMCmdMessageBody* msgBody = [[EMCmdMessageBody alloc] initWithAction:@"rtcCall"];
-    msgBody.isDeliverOnlineOnly = YES;
-    NSDictionary* ext = @{kMsgType:kMsgTypeValue,kAction:kAlertAction,kCallId:aCallId,kCalleeDevId:self.modal.curDevId,kCallerDevId:aDevId,kTs:[self getTs]};
-    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:aCallerUid from:self.modal.curUserAccount to:aCallerUid body:msgBody ext:ext];
-    __weak typeof(self) weakself = self;
-    [EaseCallCommon printLog:@"发送消息::[被邀请者在整条逻辑的第1条消息]这条消息表示设备本身收到邀请消息"];
-    [EaseCallCommon printMessage:msg];
-    [[[EMClient sharedClient] chatManager] sendMessage:msg progress:nil completion:^(EMChatMessage *message, EMError *error) {
-        if(error) {
-            [weakself callBackError:EaseCallErrorTypeIM code:error.code description:error.errorDescription];
-        }
-    }];
-}
 
-// 发送消息有效确认消息 由发起者发送(发起者的第二条消息,所有交互消息的第三条消息)
-- (void)sendMessage_confirmValid_calleeUsername:(NSString *)calleeUsername  eventInfo:(EaseCallEventInfo *)eventInfo{
-    if (!calleeUsername.length || !eventInfo.call_id.length){
+// 发送消息有效确认消息 由发起者发送(发起者的第二条消息,所有交互消息的第三条消息) calleeUsername:(NSString *)calleeUsername
+- (void)sendMessage_confirmValid_eventInfo:(EaseCallEventInfo *)eventInfo{
+    if (!eventInfo.to.length || !eventInfo.call_id.length){
         [self callBackError:EaseCallErrorTypeProcess code:EaseCallProcessErrorCodeInvalidParams description:@"参数异常"];
         return;
     }
@@ -666,7 +624,7 @@ static EaseCallManager *easeCallManager = nil;
     msgBody.isDeliverOnlineOnly = YES;
     
 //    NSDictionary* ext = @{kMsgType:kMsgTypeValue,kAction:kConfirmRingAction,kCallId:aCallId,kCallerDevId:self.modal.curDevId,kCallStatus:[NSNumber numberWithBool:aIsCallValid],kTs:[self getTs],kCalleeDevId:aCalleeDevId};
-    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:calleeUsername from:self.modal.curUserAccount to:calleeUsername body:msgBody ext:eventInfo.generateMessageExt];
+    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:eventInfo.conversation_id from:self.modal.curUserAccount to:eventInfo.to body:msgBody ext:eventInfo.generateMessageExt];
     __weak typeof(self) weakself = self;
     [[[EMClient sharedClient] chatManager] sendMessage:msg progress:nil completion:^(EMChatMessage *message, EMError *error) {
         [EaseCallCommon printLog:@"发送消息::[邀请者在整条逻辑的第2条消息]发送消息有效确认消息[邀请者发送的一条消息,发送邀请消息后再次发送的一条消息"];
@@ -679,52 +637,16 @@ static EaseCallManager *easeCallManager = nil;
 
 
 
-// 发送消息有效确认消息(弃用) - (void)sendMessage_confirmValid_calleeUsername:(NSString *)calleeUsername  eventInfo:(EaseCallEventInfo *)eventInfo
-- (void)_sendComfirmRingMsgToCallee:(NSString*)aUid callId:(NSString*)aCallId isValid:(BOOL)aIsCallValid calleeDevId:(NSString*)aCalleeDevId
-{
-    if([aUid length] == 0 || [aCallId length] == 0 )
-        return;
-    EMCmdMessageBody* msgBody = [[EMCmdMessageBody alloc] initWithAction:@"rtcCall"];
-    msgBody.isDeliverOnlineOnly = YES;
-    NSDictionary* ext = @{kMsgType:kMsgTypeValue,kAction:kConfirmRingAction,kCallId:aCallId,kCallerDevId:self.modal.curDevId,kCallStatus:[NSNumber numberWithBool:aIsCallValid],kTs:[self getTs],kCalleeDevId:aCalleeDevId};
-    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:aUid from:self.modal.curUserAccount to:aUid body:msgBody ext:ext];
-    __weak typeof(self) weakself = self;
-    [EaseCallCommon printLog:@"发送消息::[邀请者在整条逻辑的第2条消息]发送消息有效确认消息[邀请者发送的一条消息,发送邀请消息后再次发送的一条消息"];
-    [EaseCallCommon printMessage:msg];
-    [[[EMClient sharedClient] chatManager] sendMessage:msg progress:nil completion:^(EMChatMessage *message, EMError *error) {
-        if(error) {
-            [weakself callBackError:EaseCallErrorTypeIM code:error.code description:error.errorDescription];
-        }
-    }];
-}
-
-// 发送取消呼叫消息(弃用) - (void)sendMessage_cancel_calleeUsername:(NSString*)calleeUsername eventInfo:(EaseCallEventInfo *)eventInfo
-- (void)_sendCancelCallMsgToCallee:(NSString*)aUid callId:(NSString*)aCallId
-{
-    if([aUid length] == 0 || [aCallId length] == 0 )
-        return;
-    EMCmdMessageBody* msgBody = [[EMCmdMessageBody alloc] initWithAction:@"rtcCall"];
-    NSDictionary* ext = @{kMsgType:kMsgTypeValue,kAction:kCancelCallAction,kCallId:aCallId,kCallerDevId:self.modal.curDevId,kTs:[self getTs]};
-    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:aUid from:self.modal.curUserAccount to:aUid body:msgBody ext:ext];
-    __weak typeof(self) weakself = self;
-    [EaseCallCommon printLog:@"发送消息::发送一条取消呼叫消息"];
-    [EaseCallCommon printMessage:msg];
-    [[[EMClient sharedClient] chatManager] sendMessage:msg progress:nil completion:^(EMChatMessage *message, EMError *error) {
-        if(error) {
-            [weakself callBackError:EaseCallErrorTypeIM code:error.code description:error.errorDescription];
-        }
-    }];
-}
-// 发送取消呼叫消息
-- (void)sendMessage_cancel_calleeUsername:(NSString*)calleeUsername eventInfo:(EaseCallEventInfo *)eventInfo{
-    if (!calleeUsername.length || !eventInfo.call_id.length){
+// 发送取消呼叫消息 calleeUsername:(NSString*)calleeUsername
+- (void)sendMessage_cancel_eventInfo:(EaseCallEventInfo *)eventInfo{
+    if (!eventInfo.to.length || !eventInfo.call_id.length){
         [self callBackError:EaseCallErrorTypeProcess code:EaseCallProcessErrorCodeInvalidParams description:@"参数异常"];
         return;
     }
 
     EMCmdMessageBody* msgBody = [[EMCmdMessageBody alloc] initWithAction:@"rtcCall"];
 //    NSDictionary* ext = @{kMsgType:kMsgTypeValue,kAction:kCancelCallAction,kCallId:aCallId,kCallerDevId:self.modal.curDevId,kTs:[self getTs]};
-    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:calleeUsername from:self.modal.curUserAccount to:calleeUsername body:msgBody ext:eventInfo.generateMessageExt];
+    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:eventInfo.conversation_id from:self.modal.curUserAccount to:eventInfo.to body:msgBody ext:eventInfo.generateMessageExt];
     __weak typeof(self) weakself = self;
     [[[EMClient sharedClient] chatManager] sendMessage:msg progress:nil completion:^(EMChatMessage *message, EMError *error) {
         [EaseCallCommon printLog:@"发送消息::发送一条取消呼叫消息"];
@@ -736,9 +658,9 @@ static EaseCallManager *easeCallManager = nil;
 }
 
 
-
-- (void)sendMessage_answer_callerUsername:(NSString *)callerUsername eventInfo:(EaseCallEventInfo *)eventInfo{
-    if (!callerUsername.length || !eventInfo.call_id.length || !eventInfo.callerDevice_id.length || eventInfo.result == EaseCallFeedbackResultNone){
+//answer    callerUsername:(NSString *)callerUsername
+- (void)sendMessage_answer_eventInfo:(EaseCallEventInfo *)eventInfo{
+    if (!eventInfo.to.length || !eventInfo.call_id.length || !eventInfo.callerDevice_id.length || eventInfo.result == EaseCallFeedbackResultNone){
         [self callBackError:EaseCallErrorTypeProcess code:EaseCallProcessErrorCodeInvalidParams description:@"参数异常"];
         return;
     }
@@ -749,7 +671,7 @@ static EaseCallManager *easeCallManager = nil;
 //    if(self.modal.currentCall.callType == EaseCallType1v1Audio && self.bNeedSwitchToVoice){
 ////        [ext setObject:[NSNumber numberWithBool:YES] forKey:kVideoToVoice];
 //    }
-    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:callerUsername from:self.modal.curUserAccount to:callerUsername body:msgBody ext:eventInfo.generateMessageExt];
+    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:eventInfo.conversation_id from:self.modal.curUserAccount to:eventInfo.to body:msgBody ext:eventInfo.generateMessageExt];
     __weak typeof(self) weakself = self;
     [[[EMClient sharedClient] chatManager] sendMessage:msg progress:nil completion:^(EMChatMessage *message, EMError *error) {
         [EaseCallCommon printLog:@"发送消息::[被邀请者在整条逻辑的第2条消息]点击同意邀请通话时,会发送这条消息"];
@@ -762,53 +684,11 @@ static EaseCallManager *easeCallManager = nil;
 
 }
 
-// 发送Answer消息 (弃用)- (void)sendMessage_answer_callerUsername:(NSString *)callerUsername  eventInfo:(EaseCallEventInfo *)eventInfo
-- (void)_sendAnswerMsg:(NSString*)aCallerUid callId:(NSString*)aCallId result:(NSString*)aResult devId:(NSString*)aDevId
-{
-    if([aCallerUid length] == 0 || [aCallId length] == 0 || [aResult length] == 0 || [aDevId length] == 0)
-        return;
-    EMCmdMessageBody* msgBody = [[EMCmdMessageBody alloc] initWithAction:@"rtcCall"];
-    msgBody.isDeliverOnlineOnly = YES;
-    NSMutableDictionary* ext = [@{kMsgType:kMsgTypeValue,kAction:kAnswerCallAction,kCallId:aCallId,kCalleeDevId:self.modal.curDevId,kCallerDevId:aDevId,kCallResult:aResult,kTs:[self getTs]} mutableCopy];
-    if(self.modal.currentCall.callType == EaseCallType1v1Audio && self.bNeedSwitchToVoice)
-        [ext setObject:[NSNumber numberWithBool:YES] forKey:kVideoToVoice];
-    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:aCallerUid from:self.modal.curUserAccount to:aCallerUid body:msgBody ext:ext];
-    __weak typeof(self) weakself = self;
-    [EaseCallCommon printLog:@"发送消息::[被邀请者在整条逻辑的第2条消息]点击同意邀请通话时,会发送这条消息"];
-    [EaseCallCommon printMessage:msg];
-    [[[EMClient sharedClient] chatManager] sendMessage:msg progress:nil completion:^(EMChatMessage *message, EMError *error) {
-        if(error) {
-            [weakself callBackError:EaseCallErrorTypeIM code:error.code description:error.errorDescription];
-        }
-    }];
-    [self _startConfirmTimer:aCallId];
-}
 
-// 发送仲裁消息//被邀请者同意之后,邀请者收到同意消息,然后发送给被邀请者一条消息,会执行到这里(弃用)- (void)sendMessage_confirmAnswer_calleeUsername:(NSString *)calleeUsername eventInfo:(EaseCallEventInfo *)eventInfo
-- (void)_sendConfirmAnswerMsgToCallee:(NSString*)aUid callId:(NSString*)aCallId result:(NSString*)aResult devId:(NSString*)aDevId
-{
-    if([aUid length] == 0 || [aCallId length] == 0 || [aResult length] == 0 || [aDevId length] == 0)
-        return;
-    EMCmdMessageBody* msgBody = [[EMCmdMessageBody alloc] initWithAction:@"rtcCall"];
-    msgBody.isDeliverOnlineOnly = YES;
-    NSMutableDictionary* ext = [@{kMsgType:kMsgTypeValue,kAction:kConfirmCalleeAction,kCallId:aCallId,kCallerDevId:self.modal.curDevId,kCalleeDevId:aDevId,kCallResult:aResult,kTs:[self getTs]} mutableCopy];
-    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:aUid from:self.modal.curUserAccount to:aUid body:msgBody ext:ext];
-    __weak typeof(self) weakself = self;
-    [EaseCallCommon printLog:@"发送消息::[邀请者在整条逻辑的第3条消息]发送仲裁消息//被邀请者同意之后,邀请者收到同意消息,然后发送给被邀请者一条消息,会执行到这里"];
-    [EaseCallCommon printMessage:msg];
-    [[[EMClient sharedClient] chatManager] sendMessage:msg progress:nil completion:^(EMChatMessage *message, EMError *error) {
-        if(error) {
-            [weakself callBackError:EaseCallErrorTypeIM code:error.code description:error.errorDescription];
-        }
-    }];
-    if([aResult isEqualToString:kAcceptResult]) {
-        self.modal.state = EaseCallState_Answering;
-    }
-}
 
-// 发送仲裁消息//被邀请者同意之后,邀请者收到同意消息,然后发送给被邀请者一条消息,会执行到这里
-- (void)sendMessage_confirmAnswer_calleeUsername:(NSString *)calleeUsername eventInfo:(EaseCallEventInfo *)eventInfo {
-    if (!calleeUsername.length || !eventInfo.call_id.length || eventInfo.result == EaseCallFeedbackResultNone || !eventInfo.calleeDevice_id.length){
+// 发送仲裁消息//被邀请者同意之后,邀请者收到同意消息,然后发送给被邀请者一条消息,会执行到这里  calleeUsername:(NSString *)calleeUsername
+- (void)sendMessage_confirmAnswer_eventInfo:(EaseCallEventInfo *)eventInfo {
+    if (!eventInfo.to.length || !eventInfo.call_id.length || eventInfo.result == EaseCallFeedbackResultNone || !eventInfo.calleeDevice_id.length){
         [self callBackError:EaseCallErrorTypeProcess code:EaseCallProcessErrorCodeInvalidParams description:@"参数异常"];
         return;
     }
@@ -818,7 +698,7 @@ static EaseCallManager *easeCallManager = nil;
     EMCmdMessageBody* msgBody = [[EMCmdMessageBody alloc] initWithAction:@"rtcCall"];
     msgBody.isDeliverOnlineOnly = YES;
 //    NSMutableDictionary* ext = [@{kMsgType:kMsgTypeValue,kAction:kConfirmCalleeAction,kCallId:aCallId,kCallerDevId:self.modal.curDevId,kCalleeDevId:aDevId,kCallResult:aResult,kTs:[self getTs]} mutableCopy];
-    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:calleeUsername from:self.modal.curUserAccount to:calleeUsername body:msgBody ext:eventInfo.generateMessageExt];
+    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:eventInfo.conversation_id from:self.modal.curUserAccount to:eventInfo.to body:msgBody ext:eventInfo.generateMessageExt];
     __weak typeof(self) weakself = self;
     [[[EMClient sharedClient] chatManager] sendMessage:msg progress:nil completion:^(EMChatMessage *message, EMError *error) {
         [EaseCallCommon printLog:@"发送消息::[邀请者在整条逻辑的第3条消息]发送仲裁消息//被邀请者同意之后,邀请者收到同意消息,然后发送给被邀请者一条消息,会执行到这里"];
@@ -832,33 +712,16 @@ static EaseCallManager *easeCallManager = nil;
     }
 }
 
-// 发送视频转音频消息
-- (void)_sendVideoToVoiceMsg:(NSString*)aUid callId:(NSString*)aCallId
-{
-    if([aUid length] == 0 || [aCallId length] == 0)
-        return;
-    EMCmdMessageBody* msgBody = [[EMCmdMessageBody alloc] initWithAction:@"rtcCall"];
-    NSDictionary* ext = @{kMsgType:kMsgTypeValue,kAction:kVideoToVoice,kCallId:aCallId,kTs:[self getTs]};
-    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:aUid from:self.modal.curUserAccount to:aUid body:msgBody ext:ext];
-    __weak typeof(self) weakself = self;
-    [EaseCallCommon printLog:@"发送消息::视频转音频"];
-    [EaseCallCommon printMessage:msg];
-    [[[EMClient sharedClient] chatManager] sendMessage:msg progress:nil completion:^(EMChatMessage *message, EMError *error) {
-        if(error) {
-            [weakself callBackError:EaseCallErrorTypeIM code:error.code description:error.errorDescription];
-        }
-    }];
-}
 
-// 发送视频转音频消息
-- (void)sendMessage_toAudio_partyUsername:(NSString*)partyUsername eventInfo:(EaseCallEventInfo *)eventInfo{
-    if (!partyUsername.length || !eventInfo.call_id.length){
+// 发送视频转音频消息  partyUsername:(NSString*)partyUsername
+- (void)sendMessage_toAudio_eventInfo:(EaseCallEventInfo *)eventInfo{
+    if (!eventInfo.to.length || !eventInfo.call_id.length){
         [self callBackError:EaseCallErrorTypeProcess code:EaseCallProcessErrorCodeInvalidParams description:@"参数异常"];
         return;
     }
     EMCmdMessageBody* msgBody = [[EMCmdMessageBody alloc] initWithAction:@"rtcCall"];
 //    NSDictionary* ext = @{kMsgType:kMsgTypeValue,kAction:kVideoToVoice,kCallId:aCallId,kTs:[self getTs]};
-    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:partyUsername from:self.modal.curUserAccount to:partyUsername body:msgBody ext:eventInfo.generateMessageExt];
+    EMChatMessage* msg = [[EMChatMessage alloc] initWithConversationID:eventInfo.conversation_id from:self.modal.curUserAccount to:eventInfo.to body:msgBody ext:eventInfo.generateMessageExt];
     __weak typeof(self) weakself = self;
     [[[EMClient sharedClient] chatManager] sendMessage:msg progress:nil completion:^(EMChatMessage *message, EMError *error) {
         [EaseCallCommon printLog:@"发送消息::视频转音频"];
@@ -875,248 +738,268 @@ static EaseCallManager *easeCallManager = nil;
     return [NSNumber numberWithLongLong:([[NSDate date] timeIntervalSince1970] * 1000)];
 }
 
-#pragma mark - 解析消息信令 弃用
-- (void)_parseMsg:(EMChatMessage*)aMsg
-{
-    if(![aMsg.to isEqualToString:[EMClient sharedClient].currentUsername])
-        return;
-    NSDictionary* ext = aMsg.ext;
-    NSString* from = aMsg.from;
-    NSString* msgType = [ext objectForKey:kMsgType];
-    if([msgType length] == 0)
-        return;
-    [EaseCallCommon printMessage:aMsg];
-    NSString* callId = [ext objectForKey:kCallId];
-    NSString* result = [ext objectForKey:kCallResult];
-    NSString* callerDevId = [ext objectForKey:kCallerDevId];
-    NSString* calleeDevId = [ext objectForKey:kCalleeDevId];
-    NSString* channelname = [ext objectForKey:kChannelName];
-    NSNumber* isValid = [ext objectForKey:kCallStatus];
-    NSNumber* callType = [ext objectForKey:kCallType];
-    NSNumber* isVideoToVoice = [ext objectForKey:kVideoToVoice];
-    NSDictionary* callExt = nil;
-    id ret = [ext objectForKey:kExt];
-    if([ret isKindOfClass:[NSDictionary class]])
-        callExt = ret;
-    __weak typeof(self) weakself = self;
-    
-    void (^parseInviteMsgExt)(NSDictionary*) = ^void (NSDictionary* ext) {
-        //[[EMClient sharedClient] log:@"parseInviteMsgExt"];
-        if(weakself.modal.currentCall && [weakself.modal.currentCall.callId isEqualToString:callId]){
-            return;
-        }
-        if([weakself.alertTimerDic objectForKey:callId])
-            return;
-        if([weakself isBusy]){
-            EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeAnswerCall];
-            eventInfo.call_id = callId;
-            eventInfo.callerDevice_id = callerDevId;
-            eventInfo.calleeDevice_id = self.modal.curDevId;
-            eventInfo.result = EaseCallFeedbackResultBusy;
-//            if (self.modal.currentCall.callType == EaseCallType1v1Audio && self.bNeedSwitchToVoice){
-//                eventInfo.toAudio = true;
+//#pragma mark - 解析消息信令 弃用
+//- (void)_parseMsg:(EMChatMessage*)aMsg
+//{
+//    if(![aMsg.to isEqualToString:[EMClient sharedClient].currentUsername])
+//        return;
+//    NSDictionary* ext = aMsg.ext;
+//    NSString* from = aMsg.from;
+//    NSString* msgType = [ext objectForKey:kMsgType];
+//    if([msgType length] == 0)
+//        return;
+//    [EaseCallCommon printMessage:aMsg];
+//    NSString* callId = [ext objectForKey:kCallId];
+//    NSString* result = [ext objectForKey:kCallResult];
+//    NSString* callerDevId = [ext objectForKey:kCallerDevId];
+//    NSString* calleeDevId = [ext objectForKey:kCalleeDevId];
+//    NSString* channelname = [ext objectForKey:kChannelName];
+//    NSNumber* isValid = [ext objectForKey:kCallStatus];
+//    NSNumber* callType = [ext objectForKey:kCallType];
+//    NSNumber* isVideoToVoice = [ext objectForKey:kVideoToVoice];
+//    NSDictionary* callExt = nil;
+//    id ret = [ext objectForKey:kExt];
+//    if([ret isKindOfClass:[NSDictionary class]])
+//        callExt = ret;
+//    __weak typeof(self) weakself = self;
+//    
+//    void (^parseInviteMsgExt)(NSDictionary*) = ^void (NSDictionary* ext) {
+//        //[[EMClient sharedClient] log:@"parseInviteMsgExt"];
+//        if(weakself.modal.currentCall && [weakself.modal.currentCall.callId isEqualToString:callId]){
+//            return;
+//        }
+//        if([weakself.alertTimerDic objectForKey:callId])
+//            return;
+//        if([weakself isBusy]){
+//            EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeAnswerCall];
+//            eventInfo.call_id = callId;
+//            eventInfo.callerDevice_id = callerDevId;
+//            eventInfo.calleeDevice_id = self.modal.curDevId;
+//            eventInfo.result = EaseCallFeedbackResultBusy;
+//            eventInfo.chat_type = EMChatTypeChat;
+//            eventInfo.conversation_id = from;
+//            eventInfo.to = from;
+////            if (self.modal.currentCall.callType == EaseCallType1v1Audio && self.bNeedSwitchToVoice){
+////                eventInfo.toAudio = true;
+////            }
+//            [weakself sendMessage_answer_eventInfo:eventInfo];
+////            [weakself sendAnswerMsg:from callId:callId result:kBusyResult devId:callerDevId];
+//        } else {
+//            ECCall* call = [[ECCall alloc] init];
+//            call.callId = callId;
+//            call.isCaller = NO;
+//            call.callType = (EaseCallType)[callType intValue];
+//            call.remoteCallDevId = callerDevId;
+//            call.channelName = channelname;
+//            call.remoteUserAccount = from;
+//            call.ext = callExt;
+//            [weakself.modal.recvCalls setObject:call forKey:callId];
+//            
+//            EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeAlert];
+//            eventInfo.call_id = callId;
+//            eventInfo.callerDevice_id = callerDevId;
+//            eventInfo.calleeDevice_id = self.modal.curDevId;
+//            eventInfo.chat_type = EMChatTypeChat;
+//            eventInfo.conversation_id = call.remoteUserAccount;
+//            eventInfo.to = call.remoteUserAccount;
+//            [weakself sendMessage_firstFeedback_eventInfo:eventInfo];
+////            [weakself sendAlertMsgToCaller:call.remoteUserAccount callId:callId devId:call.remoteCallDevId];
+//            [weakself _startAlertTimer:callId];
+//        }
+//    };
+//    void (^parseAlertMsgExt)(NSDictionary*) = ^void (NSDictionary* ext) {
+//        //[[EMClient sharedClient] log:[NSString stringWithFormat:@"parseAlertMsgExt currentCallId:%@,state:%ld",weakself.modal.currentCall.callId,(long)weakself.modal.state]];
+//        // 判断devId
+//        if([weakself.modal.curDevId isEqualToString:callerDevId]) {
+//            // 判断有效
+//            bool isEffective = true;
+//            if (!weakself.modal.currentCall){
+//                isEffective = false;
 //            }
-            [weakself sendMessage_answer_callerUsername:from eventInfo:eventInfo];
-//            [weakself sendAnswerMsg:from callId:callId result:kBusyResult devId:callerDevId];
-        } else {
-            ECCall* call = [[ECCall alloc] init];
-            call.callId = callId;
-            call.isCaller = NO;
-            call.callType = (EaseCallType)[callType intValue];
-            call.remoteCallDevId = callerDevId;
-            call.channelName = channelname;
-            call.remoteUserAccount = from;
-            call.ext = callExt;
-            [weakself.modal.recvCalls setObject:call forKey:callId];
-            
-            EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeAlert];
-            eventInfo.call_id = callId;
-            eventInfo.callerDevice_id = callerDevId;
-            eventInfo.calleeDevice_id = self.modal.curDevId;
-            [weakself sendMessage_firstFeedback_callerUsername:call.remoteUserAccount eventInfo:eventInfo];
-//            [weakself sendAlertMsgToCaller:call.remoteUserAccount callId:callId devId:call.remoteCallDevId];
-            [weakself _startAlertTimer:callId];
-        }
-    };
-    void (^parseAlertMsgExt)(NSDictionary*) = ^void (NSDictionary* ext) {
-        //[[EMClient sharedClient] log:[NSString stringWithFormat:@"parseAlertMsgExt currentCallId:%@,state:%ld",weakself.modal.currentCall.callId,(long)weakself.modal.state]];
-        // 判断devId
-        if([weakself.modal.curDevId isEqualToString:callerDevId]) {
-            // 判断有效
-            bool isEffective = true;
-            if (!weakself.modal.currentCall){
-                isEffective = false;
-            }
-            if (![weakself.modal.currentCall.callId isEqualToString:callId]){
-                isEffective = false;
-            }
-            if (!weakself.callTimerDic[from]){
-                isEffective = false;
-            }
-            EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeConfirmRing];
-            eventInfo.call_id = callId;
-            eventInfo.callerDevice_id = self.modal.curDevId;
-            eventInfo.calleeDevice_id = calleeDevId;
-            eventInfo.isEffective = isEffective;
-            
-            [weakself sendMessage_confirmValid_calleeUsername:from eventInfo:eventInfo];
-//            if(weakself.modal.currentCall && [weakself.modal.currentCall.callId isEqualToString:callId] && [weakself.callTimerDic objectForKey:from]) {
-//                [weakself sendComfirmRingMsgToCallee:from callId:callId isValid:YES calleeDevId:calleeDevId];
+//            if (![weakself.modal.currentCall.callId isEqualToString:callId]){
+//                isEffective = false;
+//            }
+//            if (!weakself.callTimerDic[from]){
+//                isEffective = false;
+//            }
+//            EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeConfirmRing];
+//            eventInfo.call_id = callId;
+//            eventInfo.callerDevice_id = self.modal.curDevId;
+//            eventInfo.calleeDevice_id = calleeDevId;
+//            eventInfo.isEffective = isEffective;
+//            eventInfo.chat_type = EMChatTypeChat;
+//            eventInfo.conversation_id = from;
+//            eventInfo.to = from;
+//            [weakself sendMessage_confirmValid_eventInfo:eventInfo];
+////            if(weakself.modal.currentCall && [weakself.modal.currentCall.callId isEqualToString:callId] && [weakself.callTimerDic objectForKey:from]) {
+////                [weakself sendComfirmRingMsgToCallee:from callId:callId isValid:YES calleeDevId:calleeDevId];
+////            }else{
+////                [weakself sendComfirmRingMsgToCallee:from callId:callId isValid:NO calleeDevId:calleeDevId];
+////            }
+//        }
+//    };
+//    void (^parseCancelCallMsgExt)(NSDictionary*) = ^void (NSDictionary* ext) {
+//        //[[EMClient sharedClient] log:[NSString stringWithFormat:@"parseCancelCallMsgExt currentCallId:%@,state:%ld",weakself.modal.currentCall.callId,(long)weakself.modal.state]];
+//        if(weakself.modal.currentCall && [weakself.modal.currentCall.callId isEqualToString:callId] && !weakself.modal.hasJoinedChannel) {
+//            [weakself _stopConfirmTimer:callId];
+//            [weakself _stopAlertTimer:callId];
+//            [weakself callBackCallEnd:EaseCallEndReasonRemoteCancel];
+//            weakself.modal.state = EaseCallState_Idle;
+//            [weakself stopSound];
+//        }else{
+//            [weakself.modal.recvCalls removeObjectForKey:callId];
+//            [weakself _stopAlertTimer:callId];
+//        }
+//    };
+//    void (^parseAnswerMsgExt)(NSDictionary*) = ^void (NSDictionary* ext) {
+//        //[[EMClient sharedClient] log:[NSString stringWithFormat:@"parseAnswerMsgExt currentCallId:%@,state:%ld",weakself.modal.currentCall.callId,weakself.modal.state]];
+//        if(weakself.modal.currentCall && [weakself.modal.currentCall.callId isEqualToString:callId] && [weakself.modal.curDevId isEqualToString:callerDevId]) {
+//            if(weakself.modal.currentCall.callType == EaseCallTypeMulti) {
+//                if(![result isEqualToString:kAcceptResult])
+//                    [[weakself getMultiVC] removePlaceHolderForMember:from];
+//                
+//                NSTimer* timer = [self.callTimerDic objectForKey:from];
+//                if(timer) {
+//                    EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeConfirmCallee];
+//                    eventInfo.call_id = callId;
+//                    eventInfo.callerDevice_id = self.modal.curDevId;
+//                    eventInfo.calleeDevice_id = calleeDevId;
+//                    eventInfo.result = [EaseCallEventInfo callFeedbackResultFromString:result];
+//                    eventInfo.chat_type = EMChatTypeChat;
+//                    eventInfo.conversation_id = from;
+//                    eventInfo.to = from;
+//
+//                    [weakself sendMessage_confirmAnswer_eventInfo:eventInfo];
+////                    [self sendConfirmAnswerMsgToCallee:from callId:callId result:result devId:calleeDevId];
+//                    [timer invalidate];
+//                    timer = nil;
+//                    [self.callTimerDic removeObjectForKey:from];
+//                }
 //            }else{
-//                [weakself sendComfirmRingMsgToCallee:from callId:callId isValid:NO calleeDevId:calleeDevId];
+//                if(weakself.modal.state == EaseCallState_Outgoing) {
+//                    if([result isEqualToString:kAcceptResult]) {
+//                        
+//                            if(isVideoToVoice && isVideoToVoice.boolValue) {
+//                                [weakself switchToVoice];
+//                            }
+//                            weakself.modal.state = EaseCallState_Answering;
+//                    }else
+//                    {
+//                        if([result isEqualToString:kRefuseresult])
+//                            [weakself callBackCallEnd:EaseCallEndReasonRefuse];
+//                        if([result isEqualToString:kBusyResult]){
+//                            [weakself callBackCallEnd:EaseCallEndReasonBusy];
+//                        }
+//                        weakself.modal.state = EaseCallState_Idle;
+//                    }
+//                    EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeConfirmCallee];
+//                    eventInfo.call_id = callId;
+//                    eventInfo.callerDevice_id = self.modal.curDevId;
+//                    eventInfo.calleeDevice_id = calleeDevId;
+//                    eventInfo.result = [EaseCallEventInfo callFeedbackResultFromString:result];
+//                    eventInfo.chat_type = EMChatTypeChat;
+//                    eventInfo.conversation_id = from;
+//                    eventInfo.to = from;
+//
+//                    [weakself sendMessage_confirmAnswer_eventInfo:eventInfo];
+////                    [weakself sendConfirmAnswerMsgToCallee:from callId:callId result:result devId:calleeDevId];
+//                }
 //            }
-        }
-    };
-    void (^parseCancelCallMsgExt)(NSDictionary*) = ^void (NSDictionary* ext) {
-        //[[EMClient sharedClient] log:[NSString stringWithFormat:@"parseCancelCallMsgExt currentCallId:%@,state:%ld",weakself.modal.currentCall.callId,(long)weakself.modal.state]];
-        if(weakself.modal.currentCall && [weakself.modal.currentCall.callId isEqualToString:callId] && !weakself.modal.hasJoinedChannel) {
-            [weakself _stopConfirmTimer:callId];
-            [weakself _stopAlertTimer:callId];
-            [weakself callBackCallEnd:EaseCallEndReasonRemoteCancel];
-            weakself.modal.state = EaseCallState_Idle;
-            [weakself stopSound];
-        }else{
-            [weakself.modal.recvCalls removeObjectForKey:callId];
-            [weakself _stopAlertTimer:callId];
-        }
-    };
-    void (^parseAnswerMsgExt)(NSDictionary*) = ^void (NSDictionary* ext) {
-        //[[EMClient sharedClient] log:[NSString stringWithFormat:@"parseAnswerMsgExt currentCallId:%@,state:%ld",weakself.modal.currentCall.callId,weakself.modal.state]];
-        if(weakself.modal.currentCall && [weakself.modal.currentCall.callId isEqualToString:callId] && [weakself.modal.curDevId isEqualToString:callerDevId]) {
-            if(weakself.modal.currentCall.callType == EaseCallTypeMulti) {
-                if(![result isEqualToString:kAcceptResult])
-                    [[weakself getMultiVC] removePlaceHolderForMember:from];
-                
-                NSTimer* timer = [self.callTimerDic objectForKey:from];
-                if(timer) {
-                    EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeConfirmCallee];
-                    eventInfo.call_id = callId;
-                    eventInfo.callerDevice_id = self.modal.curDevId;
-                    eventInfo.calleeDevice_id = calleeDevId;
-                    eventInfo.result = [EaseCallEventInfo callFeedbackResultFromString:result];
-                    [weakself sendMessage_confirmAnswer_calleeUsername:from eventInfo:eventInfo];
-//                    [self sendConfirmAnswerMsgToCallee:from callId:callId result:result devId:calleeDevId];
-                    [timer invalidate];
-                    timer = nil;
-                    [self.callTimerDic removeObjectForKey:from];
-                }
-            }else{
-                if(weakself.modal.state == EaseCallState_Outgoing) {
-                    if([result isEqualToString:kAcceptResult]) {
-                        
-                            if(isVideoToVoice && isVideoToVoice.boolValue) {
-                                [weakself switchToVoice];
-                            }
-                            weakself.modal.state = EaseCallState_Answering;
-                    }else
-                    {
-                        if([result isEqualToString:kRefuseresult])
-                            [weakself callBackCallEnd:EaseCallEndReasonRefuse];
-                        if([result isEqualToString:kBusyResult]){
-                            [weakself callBackCallEnd:EaseCallEndReasonBusy];
-                        }
-                        weakself.modal.state = EaseCallState_Idle;
-                    }
-                    EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeConfirmCallee];
-                    eventInfo.call_id = callId;
-                    eventInfo.callerDevice_id = self.modal.curDevId;
-                    eventInfo.calleeDevice_id = calleeDevId;
-                    eventInfo.result = [EaseCallEventInfo callFeedbackResultFromString:result];
-                    [weakself sendMessage_confirmAnswer_calleeUsername:from eventInfo:eventInfo];
-//                    [weakself sendConfirmAnswerMsgToCallee:from callId:callId result:result devId:calleeDevId];
-                }
-            }
-        }
-    };
-    void (^parseConfirmRingMsgExt)(NSDictionary*) = ^void (NSDictionary* ext) {
-        //[[EMClient sharedClient] log:[NSString stringWithFormat:@"parseConfirmRingMsgExt currentCallId:%@,state:%ld",weakself.modal.currentCall.callId,weakself.modal.state]];
-        if([weakself.alertTimerDic objectForKey:callId] && [calleeDevId isEqualToString:weakself.modal.curDevId]) {
-            [weakself _stopAlertTimer:callId];
-            if([weakself isBusy])
-            {
-                EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeAnswerCall];
-                eventInfo.call_id = callId;
-                eventInfo.callerDevice_id = callerDevId;
-                eventInfo.calleeDevice_id = self.modal.curDevId;
-                eventInfo.result = EaseCallFeedbackResultBusy;
-                if (self.modal.currentCall.callType == EaseCallType1v1Audio && self.bNeedSwitchToVoice){
-                    eventInfo.toAudio = true;
-                }
-                [weakself sendMessage_answer_callerUsername:from eventInfo:eventInfo];
-                
-//                [weakself sendAnswerMsg:from callId:callId result:kBusyResult devId:callerDevId];
-                return;
-            }
-            ECCall* call = [weakself.modal.recvCalls objectForKey:callId];
-            if(call) {
-                if([isValid boolValue])
-                {
-                    weakself.modal.currentCall = call;
-                    [weakself.modal.recvCalls removeAllObjects];
-                    [weakself _stopAllAlertTimer];
-                    weakself.modal.state = EaseCallState_Alerting;
-                }
-                [weakself.modal.recvCalls removeObjectForKey:callId];
-            }
-            
-        }
-    };
-    void (^parseConfirmCalleeMsgExt)(NSDictionary*) = ^void (NSDictionary* ext) {
-        //[[EMClient sharedClient] log:[NSString stringWithFormat:@"parseConfirmCalleeMsgExt currentCallId:%@,state:%ld",weakself.modal.currentCall.callId,weakself.modal.state]];
-        if (weakself.modal.state == EaseCallState_Alerting && [weakself.modal.currentCall.callId isEqualToString:callId]) {
-            [weakself _stopConfirmTimer:callId];
-            if([weakself.modal.curDevId isEqualToString:calleeDevId])
-            {
-                // 仲裁为自己
-                if([result isEqualToString:kAcceptResult]) {
-                    weakself.modal.state = EaseCallState_Answering;
-                    if(weakself.modal.currentCall.callType != EaseCallType1v1Audio)
-                        [weakself setupLocalVideo];
-                    [weakself fetchToken];
-                }
-            }else{
-                // 已在其他端处理
-                [weakself callBackCallEnd:EaseCallEndReasonHandleOnOtherDevice];
-                weakself.modal.state = EaseCallState_Idle;
-                [weakself stopSound];
-            }
-        }else{
-            if([self.modal.recvCalls objectForKey:callId]) {
-                [weakself.modal.recvCalls removeObjectForKey:callId];
-                [weakself _stopAlertTimer:callId];
-            }
-        }
-    };
-    void (^parseVideoToVoiceMsg)(NSDictionary*) = ^void (NSDictionary* ext){
-        if(weakself.modal.currentCall && [weakself.modal.currentCall.callId isEqualToString:callId]) {
-            [weakself switchToVoice];
-        }
-    };
-    if([msgType isEqualToString:kMsgTypeValue]) {
-        NSString* action = [ext objectForKey:kAction];
-        if([action isEqualToString:kInviteAction]) {
-            parseInviteMsgExt(ext);
-        }
-        if([action isEqualToString:kAlertAction]) {
-            parseAlertMsgExt(ext);
-        }
-        if([action isEqualToString:kConfirmRingAction]) {
-            parseConfirmRingMsgExt(ext);
-        }
-        if([action isEqualToString:kCancelCallAction]) {
-            parseCancelCallMsgExt(ext);
-        }
-        if([action isEqualToString:kConfirmCalleeAction]) {
-            parseConfirmCalleeMsgExt(ext);
-        }
-        if([action isEqualToString:kAnswerCallAction]) {
-            parseAnswerMsgExt(ext);
-        }
-        if([action isEqualToString:kVideoToVoice]) {
-            parseVideoToVoiceMsg(ext);
-        }
-    }
-}
+//        }
+//    };
+//    void (^parseConfirmRingMsgExt)(NSDictionary*) = ^void (NSDictionary* ext) {
+//        //[[EMClient sharedClient] log:[NSString stringWithFormat:@"parseConfirmRingMsgExt currentCallId:%@,state:%ld",weakself.modal.currentCall.callId,weakself.modal.state]];
+//        if([weakself.alertTimerDic objectForKey:callId] && [calleeDevId isEqualToString:weakself.modal.curDevId]) {
+//            [weakself _stopAlertTimer:callId];
+//            if([weakself isBusy])
+//            {
+//                EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeAnswerCall];
+//                eventInfo.call_id = callId;
+//                eventInfo.callerDevice_id = callerDevId;
+//                eventInfo.calleeDevice_id = self.modal.curDevId;
+//                eventInfo.result = EaseCallFeedbackResultBusy;
+//                if (self.modal.currentCall.callType == EaseCallType1v1Audio && self.bNeedSwitchToVoice){
+//                    eventInfo.toAudio = true;
+//                }
+//                eventInfo.chat_type = EMChatTypeChat;
+//                eventInfo.conversation_id = from;
+//                eventInfo.to = from;
+//
+//                [weakself sendMessage_answer_eventInfo:eventInfo];
+//                
+////                [weakself sendAnswerMsg:from callId:callId result:kBusyResult devId:callerDevId];
+//                return;
+//            }
+//            ECCall* call = [weakself.modal.recvCalls objectForKey:callId];
+//            if(call) {
+//                if([isValid boolValue])
+//                {
+//                    weakself.modal.currentCall = call;
+//                    [weakself.modal.recvCalls removeAllObjects];
+//                    [weakself _stopAllAlertTimer];
+//                    weakself.modal.state = EaseCallState_Alerting;
+//                }
+//                [weakself.modal.recvCalls removeObjectForKey:callId];
+//            }
+//            
+//        }
+//    };
+//    void (^parseConfirmCalleeMsgExt)(NSDictionary*) = ^void (NSDictionary* ext) {
+//        //[[EMClient sharedClient] log:[NSString stringWithFormat:@"parseConfirmCalleeMsgExt currentCallId:%@,state:%ld",weakself.modal.currentCall.callId,weakself.modal.state]];
+//        if (weakself.modal.state == EaseCallState_Alerting && [weakself.modal.currentCall.callId isEqualToString:callId]) {
+//            [weakself _stopConfirmTimer:callId];
+//            if([weakself.modal.curDevId isEqualToString:calleeDevId])
+//            {
+//                // 仲裁为自己
+//                if([result isEqualToString:kAcceptResult]) {
+//                    weakself.modal.state = EaseCallState_Answering;
+//                    if(weakself.modal.currentCall.callType != EaseCallType1v1Audio)
+//                        [weakself setupLocalVideo];
+//                    [weakself fetchToken];
+//                }
+//            }else{
+//                // 已在其他端处理
+//                [weakself callBackCallEnd:EaseCallEndReasonHandleOnOtherDevice];
+//                weakself.modal.state = EaseCallState_Idle;
+//                [weakself stopSound];
+//            }
+//        }else{
+//            if([self.modal.recvCalls objectForKey:callId]) {
+//                [weakself.modal.recvCalls removeObjectForKey:callId];
+//                [weakself _stopAlertTimer:callId];
+//            }
+//        }
+//    };
+//    void (^parseVideoToVoiceMsg)(NSDictionary*) = ^void (NSDictionary* ext){
+//        if(weakself.modal.currentCall && [weakself.modal.currentCall.callId isEqualToString:callId]) {
+//            [weakself switchToVoice];
+//        }
+//    };
+//    if([msgType isEqualToString:kMsgTypeValue]) {
+//        NSString* action = [ext objectForKey:kAction];
+//        if([action isEqualToString:kInviteAction]) {
+//            parseInviteMsgExt(ext);
+//        }
+//        if([action isEqualToString:kAlertAction]) {
+//            parseAlertMsgExt(ext);
+//        }
+//        if([action isEqualToString:kConfirmRingAction]) {
+//            parseConfirmRingMsgExt(ext);
+//        }
+//        if([action isEqualToString:kCancelCallAction]) {
+//            parseCancelCallMsgExt(ext);
+//        }
+//        if([action isEqualToString:kConfirmCalleeAction]) {
+//            parseConfirmCalleeMsgExt(ext);
+//        }
+//        if([action isEqualToString:kAnswerCallAction]) {
+//            parseAnswerMsgExt(ext);
+//        }
+//        if([action isEqualToString:kVideoToVoice]) {
+//            parseVideoToVoiceMsg(ext);
+//        }
+//    }
+//}
 
 #pragma mark - 解析消息信令
 - (void)_parseMessage:(EMChatMessage*)message{
@@ -1124,7 +1007,7 @@ static EaseCallManager *easeCallManager = nil;
         return;
     }
     [EaseCallCommon printMessage:message];
-    NSString *from = message.from;
+//    NSString *from = message.from;
     EaseCallEventInfo *recvEventInfo = [EaseCallEventInfo infoWithMessage:message];
     if (!recvEventInfo) {
 //        [self callBackError:EaseCallErrorTypeProcess code:EaseCallProcessErrorCodeInvalidParams description:@"收到消息的参数异常"];
@@ -1144,12 +1027,15 @@ static EaseCallManager *easeCallManager = nil;
             eventInfo.callerDevice_id = recvEventInfo.callerDevice_id;
             eventInfo.calleeDevice_id = self.modal.curDevId;
             eventInfo.result = EaseCallFeedbackResultBusy;
-            [weakself sendMessage_answer_callerUsername:from eventInfo:eventInfo];
+            eventInfo.chat_type = EMChatTypeChat;
+            eventInfo.conversation_id = recvEventInfo.conversation_id;
+            eventInfo.to = recvEventInfo.from;
+            [weakself sendMessage_answer_eventInfo:eventInfo];
             return;
         }
         ECCall* call = [[ECCall alloc] init];
         call.isCaller = NO;
-        call.remoteUserAccount = from;
+        call.remoteUserAccount = recvEventInfo.from;
         call.callId = recvEventInfo.call_id;
         call.callType = recvEventInfo.call_type;
         call.remoteCallDevId = recvEventInfo.callerDevice_id;
@@ -1161,7 +1047,12 @@ static EaseCallManager *easeCallManager = nil;
         eventInfo.call_id = recvEventInfo.call_id;
         eventInfo.callerDevice_id = recvEventInfo.callerDevice_id;
         eventInfo.calleeDevice_id = weakself.modal.curDevId;
-        [weakself sendMessage_firstFeedback_callerUsername:call.remoteUserAccount eventInfo:eventInfo];
+        
+        eventInfo.chat_type = EMChatTypeChat;
+        eventInfo.conversation_id = recvEventInfo.from;
+        eventInfo.to = recvEventInfo.from;
+
+        [weakself sendMessage_firstFeedback_eventInfo:eventInfo];
         [weakself _startAlertTimer:recvEventInfo.call_id];
     };
     
@@ -1179,7 +1070,7 @@ static EaseCallManager *easeCallManager = nil;
         if (![weakself.modal.currentCall.callId isEqualToString:recvEventInfo.call_id]){
             isEffective = false;
         }
-        if (!weakself.callTimerDic[from]){
+        if (!weakself.callTimerDic[recvEventInfo.from]){
             isEffective = false;
         }
         EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeConfirmRing];
@@ -1187,7 +1078,11 @@ static EaseCallManager *easeCallManager = nil;
         eventInfo.callerDevice_id = recvEventInfo.callerDevice_id;
         eventInfo.calleeDevice_id = recvEventInfo.calleeDevice_id;
         eventInfo.isEffective = isEffective;
-        [weakself sendMessage_confirmValid_calleeUsername:from eventInfo:eventInfo];
+        eventInfo.chat_type = EMChatTypeChat;
+        eventInfo.conversation_id = recvEventInfo.from;
+        eventInfo.to = recvEventInfo.from;
+
+        [weakself sendMessage_confirmValid_eventInfo:eventInfo];
     };
     
     //接听方收
@@ -1211,21 +1106,25 @@ static EaseCallManager *easeCallManager = nil;
         }
         if(weakself.modal.currentCall.callType == EaseCallTypeMulti) {
             if(recvEventInfo.result != EaseCallFeedbackResultAccept){
-                [[weakself getMultiVC] removePlaceHolderForMember:from];
+                [[weakself getMultiVC] removePlaceHolderForMember:recvEventInfo.from];
             }
-            if(![self.callTimerDic objectForKey:from]) {
+            if(![self.callTimerDic objectForKey:recvEventInfo.from]) {
                 return;
             }
-            NSTimer* timer = [self.callTimerDic objectForKey:from];
+            NSTimer* timer = [self.callTimerDic objectForKey:recvEventInfo.from];
             EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeConfirmCallee];
             eventInfo.call_id = recvEventInfo.call_id;
             eventInfo.callerDevice_id = recvEventInfo.callerDevice_id;
             eventInfo.calleeDevice_id = recvEventInfo.calleeDevice_id;
             eventInfo.result = recvEventInfo.result;
-            [weakself sendMessage_confirmAnswer_calleeUsername:from eventInfo:eventInfo];
+            eventInfo.chat_type = EMChatTypeChat;
+            eventInfo.conversation_id = recvEventInfo.from;
+            eventInfo.to = recvEventInfo.from;
+
+            [weakself sendMessage_confirmAnswer_eventInfo:eventInfo];
             [timer invalidate];
             timer = nil;
-            [self.callTimerDic removeObjectForKey:from];
+            [self.callTimerDic removeObjectForKey:recvEventInfo.from];
         }else{
             if(weakself.modal.state != EaseCallState_Outgoing) {
                 return;
@@ -1247,7 +1146,11 @@ static EaseCallManager *easeCallManager = nil;
             eventInfo.callerDevice_id = recvEventInfo.callerDevice_id;
             eventInfo.calleeDevice_id = recvEventInfo.calleeDevice_id;
             eventInfo.result = recvEventInfo.result;
-            [weakself sendMessage_confirmAnswer_calleeUsername:from eventInfo:eventInfo];
+            eventInfo.chat_type = EMChatTypeChat;
+            eventInfo.conversation_id = recvEventInfo.from;
+            eventInfo.to = recvEventInfo.from;
+
+            [weakself sendMessage_confirmAnswer_eventInfo:eventInfo];
         }
     };
     
@@ -1267,7 +1170,11 @@ static EaseCallManager *easeCallManager = nil;
             if (self.modal.currentCall.callType == EaseCallType1v1Audio && self.bNeedSwitchToVoice){
                 eventInfo.toAudio = true;
             }
-            [weakself sendMessage_answer_callerUsername:from eventInfo:eventInfo];
+            eventInfo.chat_type = EMChatTypeChat;
+            eventInfo.conversation_id = recvEventInfo.from;
+            eventInfo.to = recvEventInfo.from;
+
+            [weakself sendMessage_answer_eventInfo:eventInfo];
             return;
         }
         ECCall* call = [weakself.modal.recvCalls objectForKey:recvEventInfo.call_id];
@@ -1374,7 +1281,11 @@ static EaseCallManager *easeCallManager = nil;
     EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeCancelCall];
     eventInfo.call_id = self.modal.currentCall.callId;
     eventInfo.callerDevice_id = self.modal.curDevId;
-    [self sendMessage_cancel_calleeUsername:aRemoteUser eventInfo:eventInfo];
+    eventInfo.chat_type = EMChatTypeChat;
+    eventInfo.conversation_id = aRemoteUser;
+    eventInfo.to = aRemoteUser;
+
+    [self sendMessage_cancel_eventInfo:eventInfo];
 //    [self sendCancelCallMsgToCallee:aRemoteUser callId:self.modal.currentCall.callId];
     if(self.modal.currentCall.callType != EaseCallTypeMulti) {
         [self callBackCallEnd:EaseCallEndReasonRemoteNoResponse];
@@ -1579,16 +1490,38 @@ static EaseCallManager *easeCallManager = nil;
 - (void)rtcEngine:(AgoraRtcEngineKit *)engine didOfflineOfUid:(NSUInteger)uid reason:(AgoraUserOfflineReason)reason
 {
     [[EMClient sharedClient] log:[NSString stringWithFormat:@"didOfflineOfUid uid:%lu,reason:%lu",(unsigned long)uid,reason]];
-    {
-        if(self.modal.currentCall.callType == EaseCallTypeMulti) {
-            [[self getMultiVC] removeRemoteViewForUser:[NSNumber numberWithUnsignedInteger:uid]];
-            [self.modal.currentCall.allUserAccounts removeObjectForKey:[NSNumber numberWithUnsignedInteger:uid]];
-        }else{
-            [self callBackCallEnd:EaseCallEndReasonHangup];
-            self.modal.state = EaseCallState_Idle;
-        }
+    if(self.modal.currentCall.callType == EaseCallTypeMulti) {
+        [[self getMultiVC] removeRemoteViewForUser:[NSNumber numberWithUnsignedInteger:uid]];
+        [self.modal.currentCall.allUserAccounts removeObjectForKey:[NSNumber numberWithUnsignedInteger:uid]];
+    }else{
+        [self callBackCallEnd:EaseCallEndReasonHangup];
+        self.modal.state = EaseCallState_Idle;
     }
 }
+
+// 对方加入频道 使用im_username加入则会执行这个方法
+- (void)rtcEngine:(AgoraRtcEngineKit *)engine didUserInfoUpdatedWithUserId:(NSUInteger)uid userInfo:(AgoraUserInfo *)userInfo{
+    [[EMClient sharedClient] log:[NSString stringWithFormat:@"didJoinedOfUid:%lu",(unsigned long)uid]];
+    if(self.modal.currentCall.callType == EaseCallTypeMulti) {
+        UIView *view = [UIView new];
+        [[self getMultiVC] addRemoteView:view member:[NSNumber numberWithUnsignedInteger:uid] enableVideo:YES];
+        if([self.callTimerDic objectForKey:userInfo.userAccount])
+        {
+            [self _stopCallTimer:userInfo.userAccount];
+        }
+        [[self getMultiVC] removePlaceHolderForMember:userInfo.userAccount];
+        [[self getMultiVC] setRemoteViewNickname:[self getNicknameByUserName:userInfo.userAccount] headImage:[self getHeadImageByUserName:userInfo.userAccount] uId:[NSNumber numberWithUnsignedInteger:uid]];
+    }else{
+        [self getSingleVC].isConnected = YES;
+        [self _stopCallTimer:self.modal.currentCall.remoteUserAccount];
+        [self.modal.currentCall.allUserAccounts setObject:self.modal.currentCall.remoteUserAccount forKey:[NSNumber numberWithUnsignedInteger:uid]];
+    }
+    if([self.delegate respondsToSelector:@selector(remoteUserDidJoinChannel:agoraUid:im_username:)]){
+        NSString* username = [self.modal.currentCall.allUserAccounts objectForKey:[NSNumber numberWithUnsignedInteger:uid]];
+        [self.delegate remoteUserDidJoinChannel:self.modal.currentCall.channelName agoraUid:uid im_username:username];
+    }
+}
+
 
 // 对方加入频道
 - (void)rtcEngine:(AgoraRtcEngineKit * _Nonnull)engine didJoinedOfUid:(NSUInteger)uid elapsed:(NSInteger)elapsed
@@ -1611,9 +1544,9 @@ static EaseCallManager *easeCallManager = nil;
         [self _stopCallTimer:self.modal.currentCall.remoteUserAccount];
         [self.modal.currentCall.allUserAccounts setObject:self.modal.currentCall.remoteUserAccount forKey:[NSNumber numberWithUnsignedInteger:uid]];
     }
-    if([self.delegate respondsToSelector:@selector(remoteUserDidJoinChannel:uid:username:)]){
+    if([self.delegate respondsToSelector:@selector(remoteUserDidJoinChannel:agoraUid:im_username:)]){
         NSString* username = [self.modal.currentCall.allUserAccounts objectForKey:[NSNumber numberWithUnsignedInteger:uid]];
-        [self.delegate remoteUserDidJoinChannel:self.modal.currentCall.channelName uid:uid username:username];
+        [self.delegate remoteUserDidJoinChannel:self.modal.currentCall.channelName agoraUid:uid im_username:username];
     }
 }
 
@@ -1756,8 +1689,10 @@ static EaseCallManager *easeCallManager = nil;
             EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeCancelCall];
             eventInfo.call_id = self.modal.currentCall.callId;
             eventInfo.callerDevice_id = self.modal.curDevId;
-            [self sendMessage_cancel_calleeUsername:self.modal.currentCall.remoteUserAccount eventInfo:eventInfo];
-
+            eventInfo.chat_type = EMChatTypeChat;
+            eventInfo.conversation_id = self.modal.currentCall.remoteUserAccount;
+            eventInfo.to = self.modal.currentCall.remoteUserAccount;
+            [self sendMessage_cancel_eventInfo:eventInfo];
             [self _stopCallTimer:self.modal.currentCall.remoteUserAccount];
 //            [self sendCancelCallMsgToCallee:self.modal.currentCall.remoteUserAccount callId:self.modal.currentCall.callId];
             [self callBackCallEnd:EaseCallEndReasonCancel];
@@ -1773,7 +1708,10 @@ static EaseCallManager *easeCallManager = nil;
             if (self.modal.currentCall.callType == EaseCallType1v1Audio && self.bNeedSwitchToVoice){
                 eventInfo.toAudio = true;
             }
-            [self sendMessage_answer_callerUsername:self.modal.currentCall.remoteUserAccount eventInfo:eventInfo];
+            eventInfo.chat_type = EMChatTypeChat;
+            eventInfo.conversation_id = self.modal.currentCall.remoteUserAccount;
+            eventInfo.to = self.modal.currentCall.remoteUserAccount;
+            [self sendMessage_answer_eventInfo:eventInfo];
 //            [self sendAnswerMsg:self.modal.currentCall.remoteUserAccount callId:self.modal.currentCall.callId result:kRefuseresult devId:self.modal.currentCall.remoteCallDevId];
             [self callBackCallEnd:EaseCallEndReasonRefuse];
             self.modal.state = EaseCallState_Idle;
@@ -1793,7 +1731,10 @@ static EaseCallManager *easeCallManager = nil;
     if (self.modal.currentCall.callType == EaseCallType1v1Audio && self.bNeedSwitchToVoice){
         eventInfo.toAudio = true;
     }
-    [self sendMessage_answer_callerUsername:self.modal.currentCall.remoteUserAccount eventInfo:eventInfo];
+    eventInfo.chat_type = EMChatTypeChat;
+    eventInfo.conversation_id = self.modal.currentCall.remoteUserAccount;
+    eventInfo.to = self.modal.currentCall.remoteUserAccount;
+    [self sendMessage_answer_eventInfo:eventInfo];
 //    [self sendAnswerMsg:self.modal.currentCall.remoteUserAccount callId:self.modal.currentCall.callId result:kAcceptResult devId:self.modal.currentCall.remoteCallDevId];
 }
 -(void) switchCameraAction
@@ -1902,18 +1843,33 @@ static EaseCallManager *easeCallManager = nil;
     dispatch_async(dispatch_get_main_queue(), ^{
         if(weakself.modal.hasJoinedChannel)
             [weakself.agoraKit leaveChannel:nil];
-        [EMClient.sharedClient log:[NSString stringWithFormat:@"[EaseCallManager] joinChannel begin"]];
-        [weakself.agoraKit joinChannelByToken:weakself.modal.agoraRTCToken channelId:weakself.modal.currentCall.channelName info:@"" uid:self.modal.agoraUid joinSuccess:^(NSString * _Nonnull channel, NSUInteger uid, NSInteger elapsed) {
-            [EMClient.sharedClient log:[NSString stringWithFormat:@"joinChannel:%@ success",channel]];
-            if([weakself.delegate respondsToSelector:@selector(callDidJoinChannel:uid:)]) {
-                [weakself.delegate callDidJoinChannel:channel uid:uid];
-            }
-            weakself.modal.hasJoinedChannel = YES;
-            [weakself.modal.currentCall.allUserAccounts setObject:[EMClient sharedClient].currentUsername forKey:[NSNumber numberWithUnsignedInteger:uid]];
-            if(weakself.modal.currentCall.callType == EaseCallTypeMulti) {
-                [weakself enableVideo:NO];
-            }
-        }];
+        
+        if(self.config.useIMUsernameJoinChannel){
+            [weakself.agoraKit joinChannelByToken:weakself.modal.agoraRTCToken channelId:weakself.modal.currentCall.channelName userAccount:self.config.im_username joinSuccess:^(NSString * _Nonnull channel, NSUInteger uid, NSInteger elapsed) {
+                [EMClient.sharedClient log:[NSString stringWithFormat:@"joinChannel:%@ success",channel]];
+                if([weakself.delegate respondsToSelector:@selector(callDidJoinChannel:agoraUid:im_username:)]) {
+                    [weakself.delegate callDidJoinChannel:channel agoraUid:uid im_username:EMClient.sharedClient.currentUsername];
+                }
+                weakself.modal.hasJoinedChannel = YES;
+                [weakself.modal.currentCall.allUserAccounts setObject:[EMClient sharedClient].currentUsername forKey:[NSNumber numberWithUnsignedInteger:uid]];
+                if(weakself.modal.currentCall.callType == EaseCallTypeMulti) {
+                    [weakself enableVideo:NO];
+                }
+            }];
+        } else{
+            [EMClient.sharedClient log:[NSString stringWithFormat:@"[EaseCallManager] joinChannel begin"]];
+            [weakself.agoraKit joinChannelByToken:weakself.modal.agoraRTCToken channelId:weakself.modal.currentCall.channelName info:@"" uid:self.modal.agoraUid joinSuccess:^(NSString * _Nonnull channel, NSUInteger uid, NSInteger elapsed) {
+                [EMClient.sharedClient log:[NSString stringWithFormat:@"joinChannel:%@ success",channel]];
+                if([weakself.delegate respondsToSelector:@selector(callDidJoinChannel:agoraUid:)]) {
+                    [weakself.delegate callDidJoinChannel:channel agoraUid:uid];
+                }
+                weakself.modal.hasJoinedChannel = YES;
+                [weakself.modal.currentCall.allUserAccounts setObject:[EMClient sharedClient].currentUsername forKey:[NSNumber numberWithUnsignedInteger:uid]];
+                if(weakself.modal.currentCall.callType == EaseCallTypeMulti) {
+                    [weakself enableVideo:NO];
+                }
+            }];
+        }
         
         [weakself speakeOut:YES];
     });
@@ -1941,7 +1897,10 @@ static EaseCallManager *easeCallManager = nil;
     
     EaseCallEventInfo *eventInfo = [EaseCallEventInfo infoWithEventType:EaseCallEventTypeVideoToAudio];
     eventInfo.call_id = self.modal.currentCall.callId;
-    [self sendMessage_toAudio_partyUsername:self.modal.currentCall.remoteUserAccount eventInfo:eventInfo];
+    eventInfo.chat_type = EMChatTypeChat;
+    eventInfo.conversation_id = self.modal.currentCall.remoteUserAccount;
+    eventInfo.to = self.modal.currentCall.remoteUserAccount;
+    [self sendMessage_toAudio_eventInfo:eventInfo];
 //    [self sendVideoToVoiceMsg:self.modal.currentCall.remoteUserAccount callId:self.modal.currentCall.callId];
 }
 

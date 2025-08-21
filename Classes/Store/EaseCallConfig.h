@@ -70,6 +70,17 @@ NS_ASSUME_NONNULL_BEGIN
  */
 @property (nonatomic)bool enableOutputLog;
 
+/*
+ * useIMUsernameJoinChannel  使用环信username加入通道
+ */
+@property (nonatomic)bool useIMUsernameJoinChannel;
+
+/*
+ * em_username  环信的im username
+ */
+@property (nonatomic,copy)NSString *im_username;
+
+
 - (void)setUser:(NSString*)aUser info:(EaseCallUser*)aInfo;
 @end
 

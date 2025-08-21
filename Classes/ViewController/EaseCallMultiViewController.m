@@ -45,9 +45,9 @@
     [self.inviteButton addTarget:self action:@selector(inviteAction) forControlEvents:UIControlEventTouchUpInside];
     [self.contentView addSubview:self.inviteButton];
     [self.inviteButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.contentView);
-        make.right.equalTo(self.contentView);
-        make.width.height.equalTo(@50);
+        make.top.equalTo(self.contentView.mas_safeAreaLayoutGuideTop);
+        make.right.equalTo(self.contentView).offset(-8);
+        make.width.height.equalTo(@44);
     }];
     [self.contentView bringSubviewToFront:self.inviteButton];
     [self.inviteButton setHidden:YES];
@@ -60,7 +60,7 @@
             [self.remoteHeadView mas_makeConstraints:^(MASConstraintMaker *make) {
                 make.width.height.equalTo(@80);
                 make.centerX.equalTo(self.contentView);
-                make.top.equalTo(@100);
+                make.top.equalTo(self.contentView.mas_safeAreaLayoutGuideTop).offset(40);
             }];
             [self.remoteHeadView sd_setImageWithURL:remoteUrl];
             self.remoteNameLable = [[UILabel alloc] init];
@@ -136,7 +136,7 @@
     [view addSubview:remoteView];
     [self.contentView addSubview:view];
     [remoteView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(view);
+        make.edges.equalTo(view);
     }];
     [view sendSubviewToBack:remoteView];
     [self.contentView sendSubviewToBack:view];
@@ -242,7 +242,6 @@
     //int cellHeight = MIN(cellHeightH, cellWidthV);
     //int cellwidth = cellHeight
     if(self.isJoined) {
-        
         self.microphoneButton.hidden = NO;
         self.microphoneLabel.hidden = NO;
         self.enableCameraButton.hidden = NO;
@@ -259,7 +258,7 @@
         if(self.bigView) {
             [self.bigView mas_remakeConstraints:^(MASConstraintMaker *make) {
                 make.left.equalTo(self.contentView);
-                make.top.equalTo(self.contentView).offset(top);
+                make.top.equalTo(self.contentView.mas_safeAreaLayoutGuideTop).offset(top);
                 make.width.equalTo(@(self.contentView.bounds.size.width));
                 make.height.equalTo(@(self.contentView.bounds.size.height-top-bottom));
             }];
@@ -275,7 +274,7 @@
         }else{
             [self.localView mas_remakeConstraints:^(MASConstraintMaker *make) {
                 make.left.equalTo(self.contentView).offset(left + index%colomns * (cellwidth + colSize));
-                make.top.equalTo(self.contentView).offset(top + index/colomns * (cellHeight + colSize));
+                make.top.equalTo(self.contentView.mas_safeAreaLayoutGuideTop).offset(top + index/colomns * (cellHeight + colSize));
                 make.width.equalTo(@(cellwidth));
                 make.height.equalTo(@(cellHeight));
             }];
@@ -284,7 +283,7 @@
             for(EaseCallStreamView* view in views) {
                 [view mas_remakeConstraints:^(MASConstraintMaker *make) {
                     make.left.equalTo(self.contentView).offset(left + index%colomns * (cellwidth + colSize));
-                    make.top.equalTo(self.contentView).offset(top + index/colomns * (cellHeight + colSize));
+                    make.top.equalTo(self.contentView.mas_safeAreaLayoutGuideTop).offset(top + index/colomns * (cellHeight + colSize));
                     make.width.equalTo(@(cellwidth));
                     make.height.equalTo(@(cellHeight));
                 }];
@@ -294,7 +293,7 @@
             for(EaseCallStreamView* view in placeViews) {
                 [view mas_remakeConstraints:^(MASConstraintMaker *make) {
                     make.left.equalTo(self.contentView).offset(left + index%colomns * (cellwidth + colSize));
-                    make.top.equalTo(self.contentView).offset(top + index/colomns * (cellHeight + colSize));
+                    make.top.equalTo(self.contentView.mas_safeAreaLayoutGuideTop).offset(top + index/colomns * (cellHeight + colSize));
                     make.width.equalTo(@(cellwidth));
                     make.height.equalTo(@(cellHeight));
                 }];

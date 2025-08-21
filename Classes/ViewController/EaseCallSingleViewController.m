@@ -234,18 +234,18 @@
             [self.hangupButton mas_remakeConstraints:^(MASConstraintMaker *make) {
                 make.centerX.equalTo(self.contentView);
                 make.width.height.equalTo(@60);
-                make.bottom.equalTo(self.contentView).with.offset(-40);
+                make.bottom.equalTo(self.contentView.mas_safeAreaLayoutGuideBottom).offset(-32);
             }];
             [self.microphoneButton mas_remakeConstraints:^(MASConstraintMaker *make) {
 //                    make.bottom.equalTo(self.hangupButton);
 //                    make.width.height.equalTo(self.hangupButton);
-                make.bottom.equalTo(self.contentView).with.offset(-40);
+                make.bottom.equalTo(self.contentView.mas_safeAreaLayoutGuideBottom).offset(-32);
                 make.left.equalTo(@40);
             }];
             [self.speakerButton mas_remakeConstraints:^(MASConstraintMaker *make) {
 //                    make.bottom.equalTo(self.hangupButton);
 //                    make.width.height.equalTo(self.hangupButton);
-                make.bottom.equalTo(self.contentView).with.offset(-40);
+                make.bottom.equalTo(self.contentView.mas_safeAreaLayoutGuideBottom).offset(-32);
                 make.right.equalTo(self.contentView).with.offset(-40);
             }];
         }else{
@@ -264,18 +264,18 @@
                 [self.hangupButton mas_remakeConstraints:^(MASConstraintMaker *make) {
                     make.centerX.equalTo(self.contentView);
                     make.width.height.equalTo(@60);
-                    make.bottom.equalTo(self.contentView).with.offset(-40);
+                    make.bottom.equalTo(self.contentView.mas_safeAreaLayoutGuideBottom).offset(-32);
                 }];
                 [self.microphoneButton mas_remakeConstraints:^(MASConstraintMaker *make) {
 //                    make.bottom.equalTo(self.hangupButton);
 //                    make.width.height.equalTo(self.hangupButton);
-                    make.bottom.equalTo(self.contentView).with.offset(-40);
+                    make.bottom.equalTo(self.contentView.mas_safeAreaLayoutGuideBottom).offset(-32);
                     make.left.equalTo(@40);
                 }];
                 [self.speakerButton mas_remakeConstraints:^(MASConstraintMaker *make) {
 //                    make.bottom.equalTo(self.hangupButton);
 //                    make.width.height.equalTo(self.hangupButton);
-                    make.bottom.equalTo(self.contentView).with.offset(-40);
+                    make.bottom.equalTo(self.contentView.mas_safeAreaLayoutGuideBottom).offset(-32);
                     make.right.equalTo(self.contentView).with.offset(-40);
                 }];
                 
@@ -325,7 +325,7 @@
             [self.hangupButton mas_remakeConstraints:^(MASConstraintMaker *make) {
                 make.centerX.equalTo(self.contentView);
                 make.width.height.equalTo(@60);
-                make.bottom.equalTo(self.contentView).with.offset(-40);
+                make.bottom.equalTo(self.contentView.mas_safeAreaLayoutGuideBottom).offset(-32);
             }];
             [self.switchToVoiceLable mas_remakeConstraints:^(MASConstraintMaker *make) {
                 make.left.equalTo(@60);
@@ -337,8 +337,8 @@
                 make.width.height.equalTo(@60);
             }];
             [self.switchCameraButton mas_remakeConstraints:^(MASConstraintMaker *make) {
-                            make.bottom.equalTo(self.contentView).with.offset(-40);
-                            make.right.equalTo(self.contentView).with.offset(-40);
+                make.bottom.equalTo(self.contentView.mas_safeAreaLayoutGuideBottom).offset(-32);
+                make.right.equalTo(self.contentView).with.offset(-40);
             }];
         }else{
             // 未接通

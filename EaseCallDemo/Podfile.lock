@@ -17,6 +17,7 @@ PODS:
 
 DEPENDENCIES:
   - EaseCallKit (from `../`)
+  - HyphenateChat (= 4.15.0)
   - MBProgressHUD (= 1.2.0)
   - WHToast
 
@@ -44,6 +45,6 @@ SPEC CHECKSUMS:
   SDWebImage: f84b0feeb08d2d11e6a9b843cb06d75ebf5b8868
   WHToast: 11a17a3f09f5f733e32bd6f3338919a448cbb719
 
-PODFILE CHECKSUM: 4a6de7b0c43fb98c983e6f32a6f8009c43a243da
+PODFILE CHECKSUM: 4f750200b3f84f99cc12bd3de62eddaaa5be9cf6
 
 COCOAPODS: 1.16.2

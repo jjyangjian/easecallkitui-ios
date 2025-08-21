@@ -71,6 +71,11 @@
     if (!info.call_id.length){
         return nil;
     }
+    
+    info.chat_type = message.chatType;
+    info.conversation_id = message.conversationId;
+    info.from = message.from;
+    info.to = message.to;
     return info;
 }
 //+ (EaseCallEventType)callEventTypeFromString:(NSString *)value;
